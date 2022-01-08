@@ -15,11 +15,19 @@
  */
 package com.alibaba.csp.sentinel.demo.spring.webmvc.controller;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+
+import com.alibaba.csp.sentinel.slots.block.degrade.DegradeRule;
+import com.alibaba.csp.sentinel.slots.block.degrade.circuitbreaker.CircuitBreaker;
+import com.alibaba.csp.sentinel.slots.block.degrade.circuitbreaker.CircuitBreakerStateChangeObserver;
+import com.alibaba.csp.sentinel.slots.block.degrade.circuitbreaker.EventObserverRegistry;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.ModelAndView;
 
@@ -49,6 +57,44 @@ public class WebMvcTestController {
     public String apiFoo(@PathVariable("id") Long id) {
         doBusiness();
         return "Hello " + id;
+    }
+
+    static {
+        EventObserverRegistry instance = EventObserverRegistry.getInstance();
+        instance.addStateChangeObserver("test", new CircuitBreakerStateChangeObserver() {
+            @Override
+            public void onStateChange(CircuitBreaker.State prevState, CircuitBreaker.State newState, DegradeRule rule, Double snapshotValue) {
+                Date date = new Date(System.currentTimeMillis());
+                SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
+                String format = simpleDateFormat.format(date);
+                System.out.println(String.format("time [%s] prevState [%s] ---> newState [%s], snapshotValue: [%s]  ",
+                        format, prevState, newState, snapshotValue));
+            }
+        });
+    }
+
+    private static final String INFO_PATTERN = "is=[%s], timeout=[%s]";
+
+    @GetMapping("/exception/{is}")
+    @ResponseBody
+    public String apiException(@PathVariable("is") Boolean is, @RequestParam(value = "timeout", defaultValue = "200") Integer timeout) {
+        doBusiness(is, timeout);
+        return String.format(INFO_PATTERN, is, timeout);
+    }
+
+    private void doBusiness(Boolean is, Integer timeout) {
+        if (is) {
+            throw new IllegalStateException(String.format(INFO_PATTERN, is, timeout));
+        }
+        doBusiness(timeout);
+    }
+
+    private void doBusiness(int timeout) {
+        try {
+            TimeUnit.MILLISECONDS.sleep(timeout);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
     @GetMapping("/exclude/{id}")
