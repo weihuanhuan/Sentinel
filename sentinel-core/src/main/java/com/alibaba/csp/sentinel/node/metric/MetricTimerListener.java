@@ -61,6 +61,7 @@ public class MetricTimerListener implements Runnable {
             long time = entry.getKey();
             MetricNode metricNode = entry.getValue();
             metricNode.setResource(node.getName());
+            metricNode.setConcurrency(node.curThreadNum());
             metricNode.setClassification(node.getResourceType());
             maps.computeIfAbsent(time, k -> new ArrayList<MetricNode>());
             List<MetricNode> nodes = maps.get(time);
